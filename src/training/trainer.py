@@ -8,6 +8,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from collections.abc import Mapping
+
+from src.optimizers import GlobalizedRiemannianLBFGS
+
 
 def linear_decay_lr(
     initial_lr: float,
@@ -21,6 +25,83 @@ def linear_decay_lr(
         raise ValueError("total_steps must be positive.")
 
     return initial_lr * (1.0 - step / total_steps)
+
+
+
+def manifold_parameter_step(
+    model: nn.Module,
+    manifold_optimizers: Mapping[
+        torch.nn.Parameter,
+        GlobalizedRiemannianLBFGS,
+    ],
+    lr: float,
+) -> None:
+    """
+    Update model parameters after backward().
+
+    Parameters registered in ``manifold_optimizers`` are updated with
+    globalized Riemannian L-BFGS.
+
+    Other parameters are updated with a standard Euclidean gradient step.
+
+    4D convolutional tensors are flattened to matrices before the
+    manifold update and reshaped afterwards.
+    """
+
+    with torch.no_grad():
+        for parameter in model.parameters():
+
+            if parameter.grad is None:
+                continue
+
+            # ---------------------------------------------------------
+            # Manifold-constrained parameter
+            # ---------------------------------------------------------
+            if parameter in manifold_optimizers:
+                optimizer = manifold_optimizers[parameter]
+
+                # Keep the current experiment learning rate.
+                optimizer.eta = lr
+
+                if parameter.ndim == 2:
+                    W = parameter.data
+                    G = parameter.grad
+
+                    # update() completes the curvature pair generated
+                    # by the previous step.
+                    optimizer.update(G)
+
+                    W_new = optimizer.step(W, G)
+
+                    parameter.data.copy_(W_new)
+
+                elif parameter.ndim == 4:
+                    shape = parameter.shape
+
+                    W = parameter.data.view(shape[0], -1)
+                    G = parameter.grad.view(shape[0], -1)
+
+                    optimizer.update(G)
+
+                    W_new = optimizer.step(W, G)
+
+                    parameter.data.copy_(W_new.view(shape))
+
+                else:
+                    raise ValueError(
+                        "Manifold parameters must be 2D or 4D, "
+                        f"got shape {tuple(parameter.shape)}."
+                    )
+
+            # ---------------------------------------------------------
+            # Euclidean parameter
+            # ---------------------------------------------------------
+            else:
+                parameter.data.add_(
+                    parameter.grad,
+                    alpha=-lr,
+                )
+
 
 
 def train_one_epoch_euclidean(

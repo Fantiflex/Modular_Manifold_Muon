@@ -348,14 +348,15 @@ class GlobalizedRiemannianLBFGS:
             y.norm().pow(2).item(),
         )
 
-        accepted = sy >= threshold
+        # Reject degenerate curvature pairs explicitly.
+        nondegenerate = (
+            s.norm().item() > 1e-12
+            and y.norm().item() > 1e-12
+        )
 
-        # --------------------------------------------------------------
-        # Store pair only if the cautious-update condition holds
-        # --------------------------------------------------------------
+        accepted = nondegenerate and sy >= threshold
 
         if accepted:
-
             self.pairs.append(
                 (
                     s.detach(),
@@ -365,8 +366,7 @@ class GlobalizedRiemannianLBFGS:
 
             if len(self.pairs) > self.history:
                 self.pairs.pop(0)
-
-        # --------------------------------------------------------------
+            # --------------------------------------------------------------
         # Transport the entire L-BFGS memory into the new tangent space
         # --------------------------------------------------------------
 

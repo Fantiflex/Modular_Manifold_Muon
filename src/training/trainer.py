@@ -7,6 +7,8 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import time
+
 
 from collections.abc import Mapping
 
@@ -230,3 +232,189 @@ def initialize_manifold_optimizers(
                 manifold_optimizers[parameter] = optimizer
 
     return manifold_optimizers
+
+
+
+def train_one_epoch_manifold(
+    model: nn.Module,
+    dataloader: DataLoader,
+    criterion: Callable,
+    manifold_optimizers: Mapping[
+        torch.nn.Parameter,
+        GlobalizedRiemannianLBFGS,
+    ],
+    device: torch.device,
+    initial_lr: float,
+    start_step: int,
+    total_steps: int,
+) -> tuple[float, int]:
+    """
+    Train one epoch using globalized Riemannian L-BFGS
+    on manifold parameters and gradient descent on the others.
+    """
+
+    model.train()
+
+    running_loss = 0.0
+    step = start_step
+
+    for images, labels in dataloader:
+        images = images.to(device)
+        labels = labels.to(device)
+
+        # Forward
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        # Backward
+        model.zero_grad()
+        loss.backward()
+
+        lr = linear_decay_lr(
+            initial_lr=initial_lr,
+            step=step,
+            total_steps=total_steps,
+        )
+
+        manifold_parameter_step(
+            model=model,
+            manifold_optimizers=manifold_optimizers,
+            lr=lr,
+        )
+
+        running_loss += loss.item()
+        step += 1
+
+    average_loss = running_loss / len(dataloader)
+
+    return average_loss, step
+
+
+
+
+def train_model(
+    model: nn.Module,
+    train_loader: DataLoader,
+    epochs: int,
+    initial_lr: float,
+    device: torch.device,
+    mode: str = "manifold",
+    weight_decay: float = 0.0,
+    history: int = 10,
+) -> tuple[nn.Module, list[float], list[float]]:
+    """
+    Train a classification model.
+
+    Parameters
+    ----------
+    model:
+        Neural network to train.
+
+    train_loader:
+        Training DataLoader.
+
+    epochs:
+        Number of epochs.
+
+    initial_lr:
+        Initial learning rate / manifold step size.
+
+    device:
+        Device used for training.
+
+    mode:
+        Either "manifold" or "adamw".
+
+    weight_decay:
+        Weight decay used by AdamW.
+
+    history:
+        L-BFGS memory size.
+
+    Returns
+    -------
+    model:
+        Trained model.
+
+    epoch_losses:
+        Mean loss for each epoch.
+
+    epoch_times:
+        Runtime of each epoch.
+    """
+
+    model = model.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+
+    total_steps = epochs * len(train_loader)
+    step = 0
+
+    epoch_losses = []
+    epoch_times = []
+
+    mode = mode.lower()
+
+    if mode == "manifold":
+        manifold_optimizers = initialize_manifold_optimizers(
+            model=model,
+            eta=initial_lr,
+            history=history,
+        )
+
+        optimizer = None
+
+    elif mode == "adamw":
+        manifold_optimizers = None
+
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=initial_lr,
+            weight_decay=weight_decay,
+        )
+
+    else:
+        raise ValueError(
+            f"Unknown training mode: {mode}. "
+            "Expected 'manifold' or 'adamw'."
+        )
+
+    for epoch in range(epochs):
+        start_time = time.time()
+
+        if mode == "manifold":
+            epoch_loss, step = train_one_epoch_manifold(
+                model=model,
+                dataloader=train_loader,
+                criterion=criterion,
+                manifold_optimizers=manifold_optimizers,
+                device=device,
+                initial_lr=initial_lr,
+                start_step=step,
+                total_steps=total_steps,
+            )
+
+        else:
+            epoch_loss, step = train_one_epoch_euclidean(
+                model=model,
+                dataloader=train_loader,
+                criterion=criterion,
+                optimizer=optimizer,
+                device=device,
+                initial_lr=initial_lr,
+                start_step=step,
+                total_steps=total_steps,
+            )
+
+        epoch_time = time.time() - start_time
+
+        epoch_losses.append(epoch_loss)
+        epoch_times.append(epoch_time)
+
+        print(
+            f"Epoch {epoch + 1}/{epochs} | "
+            f"Loss: {epoch_loss:.4f} | "
+            f"Time: {epoch_time:.2f}s"
+        )
+
+    return model, epoch_losses, epoch_times

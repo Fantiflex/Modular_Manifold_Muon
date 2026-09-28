@@ -154,3 +154,33 @@ def test_initialize_manifold_optimizers():
             atol=1e-6,
             rtol=1e-6,
         )
+
+
+
+def test_train_model_adamw_runs():
+    from torch.utils.data import DataLoader, TensorDataset
+
+    from src.training import train_model
+
+    X = torch.randn(16, 4)
+    y = torch.randint(0, 2, (16,))
+
+    loader = DataLoader(
+        TensorDataset(X, y),
+        batch_size=4,
+    )
+
+    model = torch.nn.Linear(4, 2)
+
+    model, losses, times = train_model(
+        model=model,
+        train_loader=loader,
+        epochs=2,
+        initial_lr=0.01,
+        device=torch.device("cpu"),
+        mode="adamw",
+    )
+
+    assert len(losses) == 2
+    assert len(times) == 2
+    assert all(torch.isfinite(torch.tensor(losses)))

@@ -6,12 +6,15 @@ import argparse
 
 import torch
 
+from src.data import create_cifar100_dataloaders
 from src.models import build_model
 from src.training import evaluate_accuracy, train_model
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Train a model on CIFAR-100."
+    )
 
     parser.add_argument(
         "--model",
@@ -40,9 +43,15 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--num-classes",
+        "--batch-size",
         type=int,
-        default=100,
+        default=1024,
+    )
+
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        default="./data",
     )
 
     parser.add_argument(
@@ -72,17 +81,46 @@ def main():
     print(f"Mode: {args.mode}")
     print(f"Learning rate: {args.lr}")
     print(f"Epochs: {args.epochs}")
+    print(f"Batch size: {args.batch_size}")
+
+    train_loader, test_loader = create_cifar100_dataloaders(
+        root=args.data_root,
+        batch_size=args.batch_size,
+    )
 
     model = build_model(
         model_type=args.model,
-        num_classes=args.num_classes,
+        num_classes=100,
     )
 
-    # DataLoaders will be plugged in next.
-    raise NotImplementedError(
-        "Dataset loading is not yet connected. "
-        "Next step: add CIFAR data utilities."
+    model, epoch_losses, epoch_times = train_model(
+        model=model,
+        train_loader=train_loader,
+        epochs=args.epochs,
+        initial_lr=args.lr,
+        device=device,
+        mode=args.mode,
+        weight_decay=args.weight_decay,
+        history=args.history,
     )
+
+    train_accuracy = evaluate_accuracy(
+        model=model,
+        dataloader=train_loader,
+        device=device,
+    )
+
+    test_accuracy = evaluate_accuracy(
+        model=model,
+        dataloader=test_loader,
+        device=device,
+    )
+
+    print("\n========== RESULTS ==========")
+    print(f"Train accuracy: {train_accuracy:.2f}%")
+    print(f"Test accuracy: {test_accuracy:.2f}%")
+    print(f"Final training loss: {epoch_losses[-1]:.4f}")
+    print(f"Total training time: {sum(epoch_times):.2f}s")
 
 
 if __name__ == "__main__":

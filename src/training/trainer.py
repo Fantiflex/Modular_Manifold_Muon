@@ -161,3 +161,72 @@ def train_one_epoch_euclidean(
     average_loss = running_loss / len(dataloader)
 
     return average_loss, step
+
+
+
+def initialize_manifold_optimizers(
+    model: nn.Module,
+    eta: float,
+    history: int = 10,
+) -> dict[torch.nn.Parameter, GlobalizedRiemannianLBFGS]:
+    """
+    Project matrix-like parameters onto the Stiefel manifold and
+    create one globalized Riemannian L-BFGS optimizer per parameter.
+
+    2D parameters are treated directly as matrices.
+    4D convolutional kernels are flattened to matrices before
+    projection, then reshaped back.
+
+    Other parameters remain Euclidean.
+    """
+
+    manifold_optimizers = {}
+
+    with torch.no_grad():
+        for parameter in model.parameters():
+
+            if not parameter.requires_grad:
+                continue
+
+            if parameter.ndim == 2:
+                optimizer = GlobalizedRiemannianLBFGS(
+                    eta=eta,
+                    history=history,
+                )
+
+                # A zero-gradient step performs the initial
+                # projection/retraction onto the manifold.
+                zero_grad = torch.zeros_like(parameter.data)
+
+                projected = optimizer.step(
+                    parameter.data,
+                    zero_grad,
+                )
+
+                parameter.data.copy_(projected)
+
+                manifold_optimizers[parameter] = optimizer
+
+            elif parameter.ndim == 4:
+                shape = parameter.shape
+
+                W = parameter.data.view(shape[0], -1)
+                zero_grad = torch.zeros_like(W)
+
+                optimizer = GlobalizedRiemannianLBFGS(
+                    eta=eta,
+                    history=history,
+                )
+
+                projected = optimizer.step(
+                    W,
+                    zero_grad,
+                )
+
+                parameter.data.copy_(
+                    projected.view(shape)
+                )
+
+                manifold_optimizers[parameter] = optimizer
+
+    return manifold_optimizers

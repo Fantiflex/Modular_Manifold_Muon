@@ -3,6 +3,13 @@ import torch
 
 from src.optimizers import GlobalizedRiemannianLBFGS
 from src.training import manifold_parameter_step
+from src.training import (
+    initialize_manifold_optimizers,
+    linear_decay_lr,
+    manifold_parameter_step,
+)
+
+
 
 
 def test_manifold_parameter_step_preserves_stiefel():
@@ -93,3 +100,57 @@ def test_linear_decay_lr_end():
     )
 
     assert abs(lr) < 1e-12
+
+
+
+def test_initialize_manifold_optimizers():
+    model = torch.nn.Sequential(
+        torch.nn.Linear(
+            4,
+            10,
+            bias=True,
+            dtype=torch.float64,
+        ),
+        torch.nn.ReLU(),
+        torch.nn.Linear(
+            10,
+            6,
+            bias=False,
+            dtype=torch.float64,
+        ),
+    )
+
+    manifold_optimizers = initialize_manifold_optimizers(
+        model=model,
+        eta=0.05,
+        history=5,
+    )
+
+    # Only the two matrix weights should be manifold parameters.
+    assert len(manifold_optimizers) == 2
+
+    for parameter in manifold_optimizers:
+        W = parameter.detach()
+
+        if W.shape[0] >= W.shape[1]:
+            identity = torch.eye(
+                W.shape[1],
+                dtype=W.dtype,
+            )
+
+            gram = W.T @ W
+
+        else:
+            identity = torch.eye(
+                W.shape[0],
+                dtype=W.dtype,
+            )
+
+            gram = W @ W.T
+
+        assert torch.allclose(
+            gram,
+            identity,
+            atol=1e-6,
+            rtol=1e-6,
+        )

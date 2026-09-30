@@ -1,0 +1,16 @@
+Device: cpu
+Model: mlp
+Optimizer: rlbfgs
+Learning rate: 0.001
+Epochs: 3
+Batch size: 1024
+Seed: 0
+Epoch 1/3 | Loss: 4.7488 | Time: 3.16s
+Epoch 2/3 | Loss: 4.7487 | Time: 3.12s
+Epoch 3/3 | Loss: 4.7486 | Time: 3.09s
+
+========== RESULTS ==========
+Train accuracy: 0.93%
+Test accuracy: 0.87%
+Final training loss: 4.7486
+Total training time: 9.37s

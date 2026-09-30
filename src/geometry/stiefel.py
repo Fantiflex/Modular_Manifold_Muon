@@ -332,8 +332,27 @@ def retract_stiefel_shape_preserving(
 
     Y_mat, original_shape = as_matrix(Y)
 
-    U, _, Vh = torch.linalg.svd(Y_mat, full_matrices=False)
+    try:
+        U, _, Vh = torch.linalg.svd(
+            Y_mat,
+            full_matrices=False,
+        )
 
+    except torch._C._LinAlgError:
+        if not torch.isfinite(Y_mat).all():
+            raise
+
+        # Numerical fallback:
+        # compute the same polar factor in higher precision.
+        Y_high_precision = Y_mat.to(torch.float64)
+
+        U, _, Vh = torch.linalg.svd(
+            Y_high_precision,
+            full_matrices=False,
+        )
+
+        U = U.to(Y_mat.dtype)
+        Vh = Vh.to(Y_mat.dtype)
     Y_retracted = U @ Vh
 
     return from_matrix(Y_retracted, original_shape)

@@ -299,3 +299,219 @@ def test_globalized_curvature_displacement_is_transported_step():
             expected_s,
             atol=1e-5,
         )
+
+
+
+def assert_tangent(W, Z, atol=1e-5):
+    residual = W.T @ Z + Z.T @ W
+
+    assert torch.allclose(
+        residual,
+        torch.zeros_like(residual),
+        atol=atol,
+    )
+
+
+def test_vanilla_y_matches_gradient_difference():
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    W_new = optimizer.step(W, G)
+
+    W_old = optimizer.last["W"]
+    g_old = optimizer.last["g"]
+    step_vec = optimizer.last["step_vec"]
+
+    expected_s = transport_by_projection(
+        W_old,
+        W_new,
+        step_vec,
+    )
+
+    transported_g = transport_by_projection(
+        W_old,
+        W_new,
+        g_old,
+    )
+
+    # Construct G_new so that:
+    #
+    # g_new = transported_g + expected_s
+    #
+    # Therefore:
+    #
+    # y = g_new - transported_g = expected_s
+    #
+    G_new = transported_g + expected_s
+
+    expected_g_new = tangent_proj(
+        W_new,
+        G_new,
+    )
+
+    expected_y = (
+        expected_g_new
+        - transported_g
+    )
+
+    accepted = optimizer.update(G_new)
+
+    assert accepted
+
+    stored_s = optimizer.S[-1]
+    stored_y = optimizer.Y[-1]
+
+    assert torch.allclose(
+        stored_s,
+        expected_s,
+        atol=1e-5,
+    )
+
+    assert torch.allclose(
+        stored_y,
+        expected_y,
+        atol=1e-5,
+    )
+    assert_tangent(W_new, stored_s)
+    assert_tangent(W_new, stored_y)
+
+
+
+def test_globalized_y_matches_gradient_difference():
+    torch.manual_seed(0)
+
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    W_new = optimizer.step(W, G)
+
+    (
+        W_old,
+        g_old,
+        step_vec,
+        _,
+    ) = optimizer._pending
+
+    expected_s = transport_by_projection(
+        W_old,
+        W_new,
+        step_vec,
+    )
+
+    transported_g = transport_by_projection(
+        W_old,
+        W_new,
+        g_old,
+    )
+
+    G_new = transported_g + expected_s
+
+    expected_g_new = tangent_proj(
+        W_new,
+        G_new,
+    )
+
+    expected_y = (
+        expected_g_new
+        - transported_g
+    )
+
+    accepted = optimizer.update(G_new)
+
+    assert accepted
+
+    stored_s, stored_y = optimizer.pairs[-1]
+
+    assert torch.allclose(
+        stored_s,
+        expected_s,
+        atol=1e-5,
+    )
+
+    assert torch.allclose(
+        stored_y,
+        expected_y,
+        atol=1e-5,
+    )
+    assert_tangent(W_new, stored_s)
+    assert_tangent(W_new, stored_y)
+
+
+def test_globalized_memory_stays_in_current_tangent_space():
+    torch.manual_seed(0)
+
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W0 = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G0 = torch.randn_like(W0)
+
+    # First step
+    W1 = optimizer.step(W0, G0)
+
+    W_old, g_old, step_vec, _ = optimizer._pending
+
+    s0 = transport_by_projection(
+        W_old,
+        W1,
+        step_vec,
+    )
+
+    g0_transported = transport_by_projection(
+        W_old,
+        W1,
+        g_old,
+    )
+
+    G1 = g0_transported + s0
+
+    assert optimizer.update(G1)
+
+    # Second step
+    W2 = optimizer.step(W1, G1)
+
+    W_old, g_old, step_vec, _ = optimizer._pending
+
+    s1 = transport_by_projection(
+        W_old,
+        W2,
+        step_vec,
+    )
+
+    g1_transported = transport_by_projection(
+        W_old,
+        W2,
+        g_old,
+    )
+
+    G2 = g1_transported + s1
+
+    assert optimizer.update(G2)
+
+    # Every stored pair must now live in T_{W2}M.
+    for s, y in optimizer.pairs:
+        assert_tangent(W2, s)
+        assert_tangent(W2, y)

@@ -105,7 +105,7 @@ def main():
         mode = "manifold"
         manifold_optimizer = args.optimizer
 
-    model, epoch_losses, epoch_times = train_model(
+    model, epoch_losses, epoch_times, optimizer_stats = train_model(
         model=model,
         train_loader=train_loader,
         epochs=args.epochs,
@@ -134,6 +134,19 @@ def main():
     print(f"Test accuracy: {test_accuracy:.2f}%")
     print(f"Final training loss: {epoch_losses[-1]:.4f}")
     print(f"Total training time: {sum(epoch_times):.2f}s")
+    if optimizer_stats:
+        print(
+            f"Accepted curvature updates: "
+            f"{optimizer_stats['accepted_updates']}"
+        )
+        print(
+            f"Rejected curvature updates: "
+            f"{optimizer_stats['rejected_updates']}"
+        )
+        print(
+            f"Curvature acceptance rate: "
+            f"{100 * optimizer_stats['acceptance_rate']:.2f}%"
+        )
 
 
 if __name__ == "__main__":

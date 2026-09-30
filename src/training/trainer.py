@@ -249,7 +249,33 @@ def initialize_manifold_optimizers(
 
     return manifold_optimizers
 
+def summarize_manifold_optimizer_stats(
+    manifold_optimizers,
+) -> dict[str, float]:
+    """
+    Aggregate optimizer diagnostics across all manifold parameters.
+    """
 
+    accepted = 0
+    rejected = 0
+
+    for optimizer in manifold_optimizers.values():
+        accepted += getattr(optimizer, "accepted_updates", 0)
+        rejected += getattr(optimizer, "rejected_updates", 0)
+
+    total = accepted + rejected
+
+    acceptance_rate = (
+        accepted / total
+        if total > 0
+        else 0.0
+    )
+
+    return {
+        "accepted_updates": accepted,
+        "rejected_updates": rejected,
+        "acceptance_rate": acceptance_rate,
+    }
 
 def train_one_epoch_manifold(
     model: nn.Module,
@@ -318,7 +344,12 @@ def train_model(
     weight_decay: float = 0.0,
     history: int = 10,
     manifold_optimizer: str = "globalized_rlbfgs",
-) -> tuple[nn.Module, list[float], list[float]]:
+) -> tuple[
+    nn.Module,
+    list[float],
+    list[float],
+    dict[str, float],
+]:
     """
     Train a classification model.
 
@@ -432,5 +463,14 @@ def train_model(
             f"Loss: {epoch_loss:.4f} | "
             f"Time: {epoch_time:.2f}s"
         )
+        
+    if mode == "manifold":
+        optimizer_stats = summarize_manifold_optimizer_stats(
+            manifold_optimizers
+        )
+    else:
+        optimizer_stats = {}
 
-    return model, epoch_losses, epoch_times
+
+    return model, epoch_losses, epoch_times, optimizer_stats
+

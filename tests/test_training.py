@@ -172,7 +172,7 @@ def test_train_model_adamw_runs():
 
     model = torch.nn.Linear(4, 2)
 
-    model, losses, times = train_model(
+    model, losses, times, stats = train_model(
         model=model,
         train_loader=loader,
         epochs=2,

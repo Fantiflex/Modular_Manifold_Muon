@@ -515,3 +515,62 @@ def test_globalized_memory_stays_in_current_tangent_space():
     for s, y in optimizer.pairs:
         assert_tangent(W2, s)
         assert_tangent(W2, y)
+
+
+
+def test_globalized_gamma_matches_standard_lbfgs_scaling():
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.1,
+        history=10,
+    )
+
+    s = torch.tensor([[2.0, 0.0]])
+    y = torch.tensor([[1.0, 0.0]])
+
+    optimizer.pairs = [(s, y)]
+
+    gamma = optimizer._gamma_from_memory()
+
+    expected = (
+        torch.sum(s * y)
+        / torch.sum(y * y)
+    ).item()
+
+    assert abs(gamma - expected) < 1e-12
+
+
+def test_globalized_gamma_respects_lower_bound():
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.1,
+        history=10,
+        c0=1e-4,
+        c1=1.0,
+    )
+
+    s = torch.tensor([[1e-10, 0.0]])
+    y = torch.tensor([[1.0, 0.0]])
+
+    optimizer.pairs = [(s, y)]
+
+    gamma = optimizer._gamma_from_memory()
+
+    assert gamma >= 1e-4
+
+
+
+def test_globalized_gamma_respects_upper_bound():
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.1,
+        history=10,
+        c0=1e-4,
+        c1=1.0,
+    )
+
+    s = torch.tensor([[1e6, 0.0]])
+    y = torch.tensor([[1.0, 0.0]])
+
+    optimizer.pairs = [(s, y)]
+
+    gamma = optimizer._gamma_from_memory()
+
+    assert gamma <= 1e4

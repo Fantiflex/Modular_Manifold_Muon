@@ -777,5 +777,228 @@ def test_vanilla_two_loop_with_memory_is_descent():
 
 
 
+def random_wide_stiefel(rows: int, cols: int) -> torch.Tensor:
+    """
+    Generate a wide matrix with orthonormal rows.
+
+    For rows < cols, the Stiefel constraint is
+
+        W W^T = I.
+    """
+    assert rows < cols
+
+    A = torch.randn(
+        cols,
+        rows,
+        dtype=torch.float64,
+    )
+
+    Q, _ = torch.linalg.qr(
+        A,
+        mode="reduced",
+    )
+
+    return Q.T
+
+
+def test_vanilla_wide_matrix_full_update_cycle():
+    """
+    Vanilla R-LBFGS wide-matrix update cycle.
+
+    Verifies that a wide matrix survives multiple
+
+        step -> curvature update -> step
+
+    operations while preserving its original shape and the
+    row-Stiefel constraint
+
+        W W^T = I.
+
+    This exercises the optimizer's internal transpose logic,
+    curvature memory, and vector transport together.
+    """
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.05,
+        history=5,
+    )
+
+    W0 = random_wide_stiefel(3, 8)
+    G0 = torch.randn_like(W0)
+
+    # First step
+    W1 = optimizer.step(W0, G0)
+
+    assert W1.shape == W0.shape
+
+    identity = torch.eye(
+        W1.shape[0],
+        dtype=W1.dtype,
+    )
+
+    assert torch.allclose(
+        W1 @ W1.T,
+        identity,
+        atol=1e-8,
+    )
+
+    # Construct positive curvature in the optimizer's
+    # internal coordinate system.
+    W_old = optimizer.last["W"]
+    g_old = optimizer.last["g"]
+    step_vec = optimizer.last["step_vec"]
+
+    W1_internal = (
+        W1.T
+        if W1.shape[0] < W1.shape[1]
+        else W1
+    )
+
+    s = transport_by_projection(
+        W_old,
+        W1_internal,
+        step_vec,
+    )
+
+    transported_g = transport_by_projection(
+        W_old,
+        W1_internal,
+        g_old,
+    )
+
+    G1_internal = transported_g + s
+
+    G1 = (
+        G1_internal.T
+        if W1.shape[0] < W1.shape[1]
+        else G1_internal
+    )
+
+    assert optimizer.update(G1)
+
+    # Second step uses actual L-BFGS memory.
+    W2 = optimizer.step(W1, G1)
+
+    assert W2.shape == W0.shape
+
+    assert torch.allclose(
+        W2 @ W2.T,
+        identity,
+        atol=1e-8,
+    )
+
+    assert len(optimizer.S) > 0
+
+
+
+def test_globalized_wide_matrix_full_update_cycle():
+    """
+    Globalized R-LBFGS wide-matrix update cycle.
+
+    Verifies that a wide matrix survives multiple
+
+        step -> cautious curvature update -> step
+
+    operations while preserving its original shape and the
+    row-Stiefel constraint
+
+        W W^T = I.
+
+    This exercises the optimizer's wide-matrix handling,
+    normalized manifold step, curvature memory, and vector
+    transport together.
+    """
+    torch.manual_seed(0)
+
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.05,
+        history=5,
+    )
+
+    W0 = random_wide_stiefel(3, 8)
+    G0 = torch.randn_like(W0)
+
+    # ---- First step ----
+    W1 = optimizer.step(W0, G0)
+
+    assert W1.shape == W0.shape
+
+    identity = torch.eye(
+        W1.shape[0],
+        dtype=W1.dtype,
+    )
+
+    assert torch.allclose(
+        W1 @ W1.T,
+        identity,
+        atol=1e-8,
+    )
+
+    assert optimizer._pending is not None
+
+    (
+        W_old,
+        g_old,
+        step_vec,
+        _,
+    ) = optimizer._pending
+
+    # Globalized R-LBFGS preserves the original wide representation.
+    W1_internal = W1
+
+    expected_s = transport_by_projection(
+        W_old,
+        W1_internal,
+        step_vec,
+    )
+
+    transported_g = transport_by_projection(
+        W_old,
+        W1_internal,
+        g_old,
+    )
+
+    # Construct positive, well-aligned curvature:
+    # y_k = s_k.
+    G1_internal = transported_g + expected_s
+
+    G1 = G1_internal
+
+    accepted = optimizer.update(G1)
+
+    assert accepted
+    assert len(optimizer.pairs) > 0
+
+    # ---- Second step, now using L-BFGS memory ----
+    W2 = optimizer.step(W1, G1)
+
+    assert W2.shape == W0.shape
+
+    assert torch.allclose(
+        W2 @ W2.T,
+        identity,
+        atol=1e-8,
+    )
+
+    # Globalized tangent step should still respect
+    # the fixed Frobenius budget.
+    assert optimizer._pending is not None
+
+    _, _, second_step_vec, _ = optimizer._pending
+
+    assert torch.allclose(
+        second_step_vec.norm(),
+        torch.tensor(
+            optimizer.eta,
+            dtype=second_step_vec.dtype,
+            device=second_step_vec.device,
+        ),
+        atol=1e-5,
+    )
+
+
+
+
 
 

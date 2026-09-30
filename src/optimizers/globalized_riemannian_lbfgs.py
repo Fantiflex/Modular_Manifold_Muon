@@ -193,16 +193,15 @@ class GlobalizedRiemannianLBFGS:
         else:
             gamma = default
 
-        # Same bounded scaling used in the research notebook.
-        omega = min(
+        # Fixed bound used for the initial inverse-Hessian scaling.
+        omega0 = min(
             self.c0,
-            self.c1 * (1.0 ** self.c2),
+            self.c1,
         )
-        self.omega_values.append(omega)
 
         return max(
-            omega,
-            min(gamma, 1.0 / omega),
+            omega0,
+            min(gamma, 1.0 / omega0),
         )
 
     # ------------------------------------------------------------------
@@ -352,6 +351,8 @@ class GlobalizedRiemannianLBFGS:
             s.flatten(),
             y.flatten(),
         ).item()
+        self.omega_values.append(omega)
+
 
         threshold = omega * max(
             s.norm().pow(2).item(),
@@ -364,6 +365,7 @@ class GlobalizedRiemannianLBFGS:
             and y.norm().item() > 1e-12
         )
 
+        
         # Diagnostics
         if not nondegenerate:
             self.degenerate_updates += 1
@@ -375,17 +377,12 @@ class GlobalizedRiemannianLBFGS:
             margin = sy / threshold
             self.cautious_margins.append(margin)
 
-
         accepted = nondegenerate and sy >= threshold
+
         if accepted:
             self.accepted_updates += 1
         else:
             self.rejected_updates += 1
-        if not nondegenerate:
-            self.degenerate_updates += 1
-
-        if threshold == 0:
-            self.zero_threshold_updates += 1
         # --------------------------------------------------------------
         # Transport existing L-BFGS memory into T_{W_new} M
         # --------------------------------------------------------------

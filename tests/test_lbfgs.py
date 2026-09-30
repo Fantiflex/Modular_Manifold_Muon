@@ -613,3 +613,163 @@ def test_globalized_gamma_respects_upper_bound():
     gamma = optimizer._gamma_from_memory()
 
     assert gamma <= 1e4
+
+
+
+def test_vanilla_rho_matches_transported_curvature_pairs():
+    """
+    Vanilla R-LBFGS curvature scaling after vector transport.
+
+    Verifies that after stored curvature pairs are transported into
+    the current tangent space, every rho_i is recomputed as
+
+        rho_i = 1 / <s_i, y_i>.
+
+    This ensures that the two-loop recursion never uses a curvature
+    scalar computed from stale pre-transport vectors.
+    """
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W0 = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G0 = torch.randn_like(W0)
+
+    # ---- First step ----
+    W1 = optimizer.step(W0, G0)
+
+    W_old = optimizer.last["W"]
+    g_old = optimizer.last["g"]
+    step_vec = optimizer.last["step_vec"]
+
+    s0 = transport_by_projection(
+        W_old,
+        W1,
+        step_vec,
+    )
+
+    g0_transported = transport_by_projection(
+        W_old,
+        W1,
+        g_old,
+    )
+
+    # Construct positive curvature:
+    # y_0 = s_0.
+    G1 = g0_transported + s0
+
+    assert optimizer.update(G1)
+
+    # ---- Second step ----
+    W2 = optimizer.step(W1, G1)
+
+    W_old = optimizer.last["W"]
+    g_old = optimizer.last["g"]
+    step_vec = optimizer.last["step_vec"]
+
+    s1 = transport_by_projection(
+        W_old,
+        W2,
+        step_vec,
+    )
+
+    g1_transported = transport_by_projection(
+        W_old,
+        W2,
+        g_old,
+    )
+
+    G2 = g1_transported + s1
+
+    assert optimizer.update(G2)
+
+    # Every rho must correspond to the CURRENT transported pair.
+    assert len(optimizer.S) == len(optimizer.Y)
+    assert len(optimizer.S) == len(optimizer.RHO)
+
+    for s, y, rho in zip(
+        optimizer.S,
+        optimizer.Y,
+        optimizer.RHO,
+    ):
+        sy = torch.sum(s * y).item()
+
+        assert torch.isfinite(torch.tensor(sy))
+        assert sy > 0
+
+        expected_rho = 1.0 / sy
+
+        assert abs(rho - expected_rho) < 1e-8
+
+
+def test_vanilla_two_loop_with_memory_is_descent():
+    """
+    Vanilla R-LBFGS two-loop recursion with curvature memory.
+
+    Verifies that after storing a valid positive-curvature pair,
+    the L-BFGS inverse-Hessian approximation still produces a
+    descent update:
+
+        <-H_k g, g> < 0.
+
+    This checks the actual quasi-Newton path rather than only the
+    empty-memory steepest-descent fallback.
+    """
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    W_new = optimizer.step(W, G)
+
+    W_old = optimizer.last["W"]
+    g_old = optimizer.last["g"]
+    step_vec = optimizer.last["step_vec"]
+
+    s = transport_by_projection(
+        W_old,
+        W_new,
+        step_vec,
+    )
+
+    transported_g = transport_by_projection(
+        W_old,
+        W_new,
+        g_old,
+    )
+
+    # Guarantees positive curvature.
+    G_new = transported_g + s
+
+    assert optimizer.update(G_new)
+    assert len(optimizer.S) > 0
+
+    q = tangent_proj(
+        W_new,
+        torch.randn_like(W_new),
+    )
+
+    Hq = optimizer.two_loops(q)
+
+    descent_direction = -Hq
+
+    inner_product = torch.sum(
+        descent_direction * q
+    )
+
+    assert torch.isfinite(inner_product)
+    assert inner_product < 0

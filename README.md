@@ -1,10 +1,17 @@
 # Modular Manifold MuOn
+Exploring Riemannian quasi-Newton methods as efficient inner solvers for Manifold MuOn.
 
-A modular PyTorch implementation for experimenting with **manifold-constrained optimization** in neural networks, with a particular focus on replacing expensive inner solvers in Manifold MuOn with **Riemannian quasi-Newton methods**.
-
-This repository accompanies my research on making manifold-based optimization more computationally practical for deep learning.
+This project replaces the original dual-ascent inner optimization with
+Riemannian L-BFGS and a globalized cautious-update variant on the Stiefel manifold.
+The goal is to reduce optimization overhead while preserving constrained geometry.
 
 ---
+## Key Contributions
+
+- Riemannian L-BFGS implementation for Stiefel-constrained parameters
+- Globalized L-BFGS with cautious curvature updates
+- Integration with MLP, CNN, and ViT experiments
+- Runtime, convergence, and learning-rate robustness comparisons
 
 ## Overview
 
@@ -39,15 +46,10 @@ Rather than solving an expensive constrained inner problem at every update, the 
 
 The globalized Riemannian L-BFGS optimizer additionally uses cautious curvature updates to reject unstable or degenerate history pairs.
 
-At a high level:
+## Method
 
-```text
 Euclidean gradient
-        ↓
-Tangent-space projection
-        ↓
-Riemannian L-BFGS direction
-        ↓
-Manifold retraction
-        ↓
-Updated constrained parameter
+→ Tangent-space projection
+→ Riemannian L-BFGS
+→ Cautious curvature update
+→ Retraction onto the Stiefel manifold

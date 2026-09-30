@@ -129,10 +129,19 @@ def main():
         device=device,
     )
 
+    mean_omega = optimizer_stats.get("mean_omega")
+    min_omega = optimizer_stats.get("min_omega")
+    max_omega = optimizer_stats.get("max_omega")
+
+    
+
     margin = optimizer_stats.get("mean_cautious_margin")
 
     if margin is not None:
         print(f"Mean cautious margin: {margin:.4f}")
+
+
+
 
     print("\n========== RESULTS ==========")
     print(f"Train accuracy: {train_accuracy:.2f}%")
@@ -152,6 +161,13 @@ def main():
             f"Curvature acceptance rate: "
             f"{100 * optimizer_stats['acceptance_rate']:.2f}%"
         )
+        mean_omega = optimizer_stats.get("mean_omega")
+        min_omega = optimizer_stats.get("min_omega")
+        max_omega = optimizer_stats.get("max_omega")
+        if mean_omega is not None:
+                print(f"Mean omega: {mean_omega:.6e}")
+                print(f"Min omega: {min_omega:.6e}")
+                print(f"Max omega: {max_omega:.6e}")
 
 
 if __name__ == "__main__":

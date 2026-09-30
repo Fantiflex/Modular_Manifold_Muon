@@ -259,12 +259,16 @@ def summarize_manifold_optimizer_stats(
     accepted = 0
     rejected = 0
     all_margins = []
+    all_omegas = []
 
     for optimizer in manifold_optimizers.values():
         accepted += getattr(optimizer, "accepted_updates", 0)
         rejected += getattr(optimizer, "rejected_updates", 0)
         all_margins.extend(
             getattr(optimizer, "cautious_margins", [])
+        )
+        all_omegas.extend(
+            getattr(optimizer, "omega_values", [])
         )
 
     total = accepted + rejected
@@ -280,12 +284,23 @@ def summarize_manifold_optimizer_stats(
         if all_margins
         else None
     )
+    mean_omega = (
+        sum(all_omegas) / len(all_omegas)
+        if all_omegas
+        else None
+    )
+
+    min_omega = min(all_omegas) if all_omegas else None
+    max_omega = max(all_omegas) if all_omegas else None
 
     return {
         "accepted_updates": accepted,
         "rejected_updates": rejected,
         "acceptance_rate": acceptance_rate,
         "mean_cautious_margin": mean_margin,
+        "mean_omega": mean_omega,
+        "min_omega": min_omega,
+        "max_omega": max_omega,
     }
 
 def train_one_epoch_manifold(

@@ -80,6 +80,7 @@ class GlobalizedRiemannianLBFGS:
         self.cautious_margins = []
         self.degenerate_updates = 0
         self.zero_threshold_updates = 0
+        self.omega_values = []
     # ------------------------------------------------------------------
     # L-BFGS two-loop recursion
     # ------------------------------------------------------------------
@@ -196,6 +197,7 @@ class GlobalizedRiemannianLBFGS:
             self.c0,
             self.c1 * (1.0 ** self.c2),
         )
+        self.omega_values.append(omega)
 
         return max(
             omega,
@@ -369,7 +371,6 @@ class GlobalizedRiemannianLBFGS:
             margin = sy / threshold
             self.cautious_margins.append(margin)
 
-        accepted = nondegenerate and sy >= threshold
 
         accepted = nondegenerate and sy >= threshold
         if accepted:

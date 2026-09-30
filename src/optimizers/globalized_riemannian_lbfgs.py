@@ -75,6 +75,8 @@ class GlobalizedRiemannianLBFGS:
 
         # Information saved between step() and update().
         self._pending = None
+        self.accepted_updates = 0
+        self.rejected_updates = 0  
 
     # ------------------------------------------------------------------
     # L-BFGS two-loop recursion
@@ -355,7 +357,10 @@ class GlobalizedRiemannianLBFGS:
         )
 
         accepted = nondegenerate and sy >= threshold
-
+        if accepted:
+            self.accepted_updates += 1
+        else:
+            self.rejected_updates += 1
         # --------------------------------------------------------------
         # Transport existing L-BFGS memory into T_{W_new} M
         # --------------------------------------------------------------
@@ -393,5 +398,18 @@ class GlobalizedRiemannianLBFGS:
                 self.pairs.pop(0)
 
         self._pending = None
+ 
 
         return accepted
+
+    @property
+    def num_updates(self) -> int:
+        return self.accepted_updates + self.rejected_updates
+
+
+    @property
+    def acceptance_rate(self) -> float:
+        if self.num_updates == 0:
+            return 0.0
+
+        return self.accepted_updates / self.num_updates

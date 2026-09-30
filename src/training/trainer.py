@@ -12,8 +12,10 @@ import time
 
 from collections.abc import Mapping
 
-from src.optimizers import GlobalizedRiemannianLBFGS
-
+from src.optimizers import (
+    RiemannianLBFGS,
+    GlobalizedRiemannianLBFGS,
+)
 
 def linear_decay_lr(
     initial_lr: float,
@@ -170,7 +172,8 @@ def initialize_manifold_optimizers(
     model: nn.Module,
     eta: float,
     history: int = 10,
-) -> dict[torch.nn.Parameter, GlobalizedRiemannianLBFGS]:
+    optimizer_name: str = "globalized_rlbfgs",
+) -> dict[torch.nn.Parameter, object]:
     """
     Project matrix-like parameters onto the Stiefel manifold and
     create one globalized Riemannian L-BFGS optimizer per parameter.
@@ -181,7 +184,20 @@ def initialize_manifold_optimizers(
 
     Other parameters remain Euclidean.
     """
+    optimizer_name = optimizer_name.lower()
 
+    optimizer_classes = {
+        "rlbfgs": RiemannianLBFGS,
+        "globalized_rlbfgs": GlobalizedRiemannianLBFGS,
+    }
+
+    if optimizer_name not in optimizer_classes:
+        raise ValueError(
+            f"Unknown manifold optimizer: {optimizer_name}. "
+            f"Expected one of {list(optimizer_classes)}."
+        )
+
+    optimizer_class = optimizer_classes[optimizer_name]
     manifold_optimizers = {}
 
     with torch.no_grad():
@@ -191,7 +207,7 @@ def initialize_manifold_optimizers(
                 continue
 
             if parameter.ndim == 2:
-                optimizer = GlobalizedRiemannianLBFGS(
+                optimizer = optimizer_class(
                     eta=eta,
                     history=history,
                 )
@@ -215,7 +231,7 @@ def initialize_manifold_optimizers(
                 W = parameter.data.view(shape[0], -1)
                 zero_grad = torch.zeros_like(W)
 
-                optimizer = GlobalizedRiemannianLBFGS(
+                optimizer = optimizer_class(
                     eta=eta,
                     history=history,
                 )
@@ -301,6 +317,7 @@ def train_model(
     mode: str = "manifold",
     weight_decay: float = 0.0,
     history: int = 10,
+    manifold_optimizer: str = "globalized_rlbfgs",
 ) -> tuple[nn.Module, list[float], list[float]]:
     """
     Train a classification model.
@@ -360,9 +377,8 @@ def train_model(
             model=model,
             eta=initial_lr,
             history=history,
+            optimizer_name=manifold_optimizer,
         )
-
-        optimizer = None
 
     elif mode == "adamw":
         manifold_optimizers = None

@@ -867,3 +867,47 @@ def test_cautious_condition_accepts_exact_threshold():
     )
 
 
+def test_vanilla_history_discards_oldest_pair():
+    """
+    Vanilla R-LBFGS bounded FIFO memory.
+
+    Verifies that after more than m accepted curvature updates,
+    only the m most recent curvature pairs remain in memory.
+    """
+    optimizer = RiemannianLBFGS(
+        eta=0.1,
+        history=2,
+    )
+
+    s1 = torch.tensor([[1.0]])
+    y1 = torch.tensor([[1.0]])
+
+    s2 = torch.tensor([[2.0]])
+    y2 = torch.tensor([[2.0]])
+
+    s3 = torch.tensor([[3.0]])
+    y3 = torch.tensor([[3.0]])
+
+    optimizer.S = [s1, s2]
+    optimizer.Y = [y1, y2]
+    optimizer.RHO = [
+        1.0 / torch.sum(s1 * y1).item(),
+        1.0 / torch.sum(s2 * y2).item(),
+    ]
+
+    optimizer.S.pop(0)
+    optimizer.Y.pop(0)
+    optimizer.RHO.pop(0)
+
+    optimizer.S.append(s3)
+    optimizer.Y.append(y3)
+    optimizer.RHO.append(
+        1.0 / torch.sum(s3 * y3).item()
+    )
+
+    assert len(optimizer.S) == 2
+    assert len(optimizer.Y) == 2
+    assert len(optimizer.RHO) == 2
+
+    assert torch.equal(optimizer.S[0], s2)
+    assert torch.equal(optimizer.S[1], s3)

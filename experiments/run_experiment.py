@@ -9,7 +9,7 @@ import torch
 from src.data import create_cifar100_dataloaders
 from src.models import build_model
 from src.training import evaluate_accuracy, train_model
-
+from experiments.sweeps import set_seed
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -65,13 +65,18 @@ def parse_args():
         type=int,
         default=10,
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+    )
 
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-
+    set_seed(args.seed)
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -82,7 +87,7 @@ def main():
     print(f"Learning rate: {args.lr}")
     print(f"Epochs: {args.epochs}")
     print(f"Batch size: {args.batch_size}")
-
+    print(f"Seed: {args.seed}")
     train_loader, test_loader = create_cifar100_dataloaders(
         root=args.data_root,
         batch_size=args.batch_size,

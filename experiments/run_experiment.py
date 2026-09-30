@@ -24,10 +24,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--mode",
+        "--optimizer",
         type=str,
-        default="manifold",
-        choices=["manifold", "adamw"],
+        default="globalized_rlbfgs",
+        choices=["adamw", "rlbfgs", "globalized_rlbfgs"],
     )
 
     parser.add_argument(
@@ -78,7 +78,7 @@ def main():
 
     print(f"Device: {device}")
     print(f"Model: {args.model}")
-    print(f"Mode: {args.mode}")
+    print(f"Optimizer: {args.optimizer}")
     print(f"Learning rate: {args.lr}")
     print(f"Epochs: {args.epochs}")
     print(f"Batch size: {args.batch_size}")
@@ -93,15 +93,23 @@ def main():
         num_classes=100,
     )
 
+    if args.optimizer == "adamw":
+        mode = "adamw"
+        manifold_optimizer = "globalized_rlbfgs"
+    else:
+        mode = "manifold"
+        manifold_optimizer = args.optimizer
+
     model, epoch_losses, epoch_times = train_model(
         model=model,
         train_loader=train_loader,
         epochs=args.epochs,
         initial_lr=args.lr,
         device=device,
-        mode=args.mode,
+        mode=mode,
         weight_decay=args.weight_decay,
         history=args.history,
+        manifold_optimizer=manifold_optimizer,
     )
 
     train_accuracy = evaluate_accuracy(

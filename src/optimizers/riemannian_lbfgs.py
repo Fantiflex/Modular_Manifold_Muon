@@ -307,22 +307,30 @@ class RiemannianLBFGS:
         # --------------------------------------------------------------
 
         self.S = [
-            transport_by_projection(
-                W,
-                W_new,
-                s_i,
-            )
+            transport_by_projection(W, W_new, s_i)
             for s_i in self.S
         ]
 
         self.Y = [
-            transport_by_projection(
-                W,
-                W_new,
-                y_i,
-            )
+            transport_by_projection(W, W_new, y_i)
             for y_i in self.Y
         ]
+        new_S = []
+        new_Y = []
+        new_RHO = []
+
+
+        for s_i, y_i in zip(self.S, self.Y):
+            sy_i = frob_inner(s_i, y_i)
+
+            if torch.isfinite(sy_i) and sy_i > self.eps_curv:
+                new_S.append(s_i)
+                new_Y.append(y_i)
+                new_RHO.append(1.0 / sy_i)
+
+        self.S = new_S
+        self.Y = new_Y
+        self.RHO = new_RHO
 
         # --------------------------------------------------------------
         # Curvature safeguard

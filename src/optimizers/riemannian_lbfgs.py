@@ -68,6 +68,8 @@ class RiemannianLBFGS:
 
         # Information cached between step() and update()
         self.last = None
+        self.accepted_updates = 0
+        self.rejected_updates = 0           
 
     # ------------------------------------------------------------------
     # Retraction
@@ -342,6 +344,7 @@ class RiemannianLBFGS:
             not torch.isfinite(sy)
             or sy <= self.eps_curv
         ):
+            self.rejected_updates += 1
             self.last = None
             return False
 
@@ -365,7 +368,15 @@ class RiemannianLBFGS:
         self.RHO.append(
             1.0 / sy
         )
-
+        self.accepted_updates += 1
         self.last = None
 
         return True
+
+
+    @property
+    def acceptance_rate(self) -> float:
+        if self.num_updates == 0:
+            return 0.0
+
+        return self.accepted_updates / self.num_updates

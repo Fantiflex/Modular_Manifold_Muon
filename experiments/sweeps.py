@@ -169,123 +169,134 @@ def run_optimizer_sweep(
                     mode = "manifold"
                     manifold_optimizer = optimizer_name
 
-                
-                    try:
-                        (
-                            model,
-                            epoch_losses,
-                            epoch_times,
-                            optimizer_stats,
-                        ) = train_model(
-                            model=model,
-                            train_loader=train_loader,
-                            epochs=epochs,
-                            initial_lr=eta,
-                            device=device,
-                            mode=mode,
-                            manifold_optimizer=manifold_optimizer,
-                            weight_decay=weight_decay,
-                            history=history,
-                        )
+                try:
+                    (
+                        model,
+                        epoch_losses,
+                        epoch_times,
+                        optimizer_stats,
+                    ) = train_model(
+                        model=model,
+                        train_loader=train_loader,
+                        epochs=epochs,
+                        initial_lr=eta,
+                        device=device,
+                        mode=mode,
+                        manifold_optimizer=manifold_optimizer,
+                        weight_decay=weight_decay,
+                        history=history,
+                    )
 
-                        train_accuracy = evaluate_accuracy(
-                            model=model,
-                            dataloader=train_loader,
-                            device=device,
-                        )
+                    train_accuracy = evaluate_accuracy(
+                        model=model,
+                        dataloader=train_loader,
+                        device=device,
+                    )
 
-                        test_accuracy = evaluate_accuracy(
-                            model=model,
-                            dataloader=test_loader,
-                            device=device,
-                        )
+                    test_accuracy = evaluate_accuracy(
+                        model=model,
+                        dataloader=test_loader,
+                        device=device,
+                    )
 
-                        row = {
-                            "model": model_type,
-                            "optimizer": optimizer_name,
-                            "lr": eta,
-                            "seed": seed,
-                            "epochs": epochs,
-                            "batch_size": batch_size,
-                            "history": history,
-                            "status": "ok",
-                            "error": "",
-                            "train_accuracy": train_accuracy,
-                            "test_accuracy": test_accuracy,
-                            "final_loss": epoch_losses[-1],
-                            "total_time_s": sum(epoch_times),
-                            "accepted_updates": optimizer_stats.get(
-                                "accepted_updates", 0
-                            ),
-                            "rejected_updates": optimizer_stats.get(
-                                "rejected_updates", 0
-                            ),
-                            "acceptance_rate": optimizer_stats.get(
-                                "acceptance_rate", 0.0
-                            ),
-                            "mean_cautious_margin": optimizer_stats.get(
-                                "mean_cautious_margin"
-                            ),
-                            "mean_omega": optimizer_stats.get("mean_omega"),
-                            "min_omega": optimizer_stats.get("min_omega"),
-                            "max_omega": optimizer_stats.get("max_omega"),
-                            
-                        }
-                        print(
-                            f"Train accuracy: "
-                            f"{train_accuracy:.2f}%"
-                        )
-                        print(
-                            f"Test accuracy: "
-                            f"{test_accuracy:.2f}%"
-                        )
-                        print(
-                            f"Final loss: "
-                            f"{epoch_losses[-1]:.4f}"
-                        )
-                        print(
-                            f"Total time: "
-                            f"{sum(epoch_times):.2f}s"
-                        )                        
+                    row = {
+                        "model": model_type,
+                        "optimizer": optimizer_name,
+                        "lr": eta,
+                        "seed": seed,
+                        "epochs": epochs,
+                        "batch_size": batch_size,
+                        "history": history,
+                        "status": "ok",
+                        "error": "",
+                        "train_accuracy": train_accuracy,
+                        "test_accuracy": test_accuracy,
+                        "final_loss": epoch_losses[-1],
+                        "total_time_s": sum(epoch_times),
+                        "accepted_updates": optimizer_stats.get(
+                            "accepted_updates",
+                            0,
+                        ),
+                        "rejected_updates": optimizer_stats.get(
+                            "rejected_updates",
+                            0,
+                        ),
+                        "acceptance_rate": optimizer_stats.get(
+                            "acceptance_rate",
+                            0.0,
+                        ),
+                        "mean_cautious_margin": optimizer_stats.get(
+                            "mean_cautious_margin"
+                        ),
+                        "mean_omega": optimizer_stats.get(
+                            "mean_omega"
+                        ),
+                        "min_omega": optimizer_stats.get(
+                            "min_omega"
+                        ),
+                        "max_omega": optimizer_stats.get(
+                            "max_omega"
+                        ),
+                    }
 
-                    except Exception as exc:
-                        print(
-                            f"\nFAILED: optimizer={optimizer_name}, "
-                            f"eta={eta}, seed={seed}"
-                        )
-                        print(f"{type(exc).__name__}: {exc}")
+                    print(
+                        f"Train accuracy: "
+                        f"{train_accuracy:.2f}%"
+                    )
+                    print(
+                        f"Test accuracy: "
+                        f"{test_accuracy:.2f}%"
+                    )
+                    print(
+                        f"Final loss: "
+                        f"{epoch_losses[-1]:.4f}"
+                    )
+                    print(
+                        f"Total time: "
+                        f"{sum(epoch_times):.2f}s"
+                    )
 
-                        row = {
-                            "model": model_type,
-                            "optimizer": optimizer_name,
-                            "lr": eta,
-                            "seed": seed,
-                            "epochs": epochs,
-                            "batch_size": batch_size,
-                            "history": history,
-                            "status": "failed",
-                            "error": f"{type(exc).__name__}: {exc}",
-                            "train_accuracy": None,
-                            "test_accuracy": None,
-                            "final_loss": None,
-                            "total_time_s": None,
-                            "accepted_updates": None,
-                            "rejected_updates": None,
-                            "acceptance_rate": None,
-                            "mean_cautious_margin": None,
-                            "mean_omega": None,
-                            "min_omega": None,
-                            "max_omega": None,
-                        }
+                except Exception as exc:
+                    print(
+                        f"\nFAILED: optimizer={optimizer_name}, "
+                        f"eta={eta}, seed={seed}"
+                    )
+                    print(
+                        f"{type(exc).__name__}: {exc}"
+                    )
 
-                    results.append(row)
+                    row = {
+                        "model": model_type,
+                        "optimizer": optimizer_name,
+                        "lr": eta,
+                        "seed": seed,
+                        "epochs": epochs,
+                        "batch_size": batch_size,
+                        "history": history,
+                        "status": "failed",
+                        "error": (
+                            f"{type(exc).__name__}: {exc}"
+                        ),
+                        "train_accuracy": None,
+                        "test_accuracy": None,
+                        "final_loss": None,
+                        "total_time_s": None,
+                        "accepted_updates": None,
+                        "rejected_updates": None,
+                        "acceptance_rate": None,
+                        "mean_cautious_margin": None,
+                        "mean_omega": None,
+                        "min_omega": None,
+                        "max_omega": None,
+                    }
 
-                    if checkpoint_path is not None:
-                        save_sweep_results(
-                            results,
-                            checkpoint_path,
-                        )
-                
+                results.append(row)
+
+                if checkpoint_path is not None:
+                    save_sweep_results(
+                        results,
+                        checkpoint_path,
+                    )
 
     return results
 

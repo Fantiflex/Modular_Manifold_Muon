@@ -19,15 +19,15 @@ def main() -> None:
     epochs = 3
     history = 10
 
-    seeds = [42]
+    seeds = [0,15,42]
 
-    etas = [
-        0.3
+    etas = [0.001,0.01,0.05,0.1,0.3,0.5
+        
     ]
 
     optimizers = [
         
-        "globalized_rlbfgs",
+        "adamw",
     ]
 
     train_loader, test_loader = (

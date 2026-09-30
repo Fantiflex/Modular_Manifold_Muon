@@ -773,3 +773,97 @@ def test_vanilla_two_loop_with_memory_is_descent():
 
     assert torch.isfinite(inner_product)
     assert inner_product < 0
+
+
+
+def cautious_condition(
+    s: torch.Tensor,
+    y: torch.Tensor,
+    omega: float,
+) -> bool:
+    sy = torch.sum(s * y).item()
+
+    threshold = omega * max(
+        s.norm().pow(2).item(),
+        y.norm().pow(2).item(),
+    )
+
+    return sy >= threshold
+
+
+
+def test_cautious_condition_accepts_above_threshold():
+    """
+    Globalized R-LBFGS cautious-update acceptance.
+
+    Verifies that a curvature pair is accepted when
+
+        <s, y> >= omega * max(||s||_F^2, ||y||_F^2).
+
+    This checks the exact mathematical acceptance rule used
+    by the globalized optimizer.
+    """
+    omega = 1e-4
+
+    s = torch.tensor([1.0, 0.0])
+    y = torch.tensor([1.0, 0.0])
+
+    assert cautious_condition(
+        s,
+        y,
+        omega,
+    )
+
+
+
+def test_cautious_condition_rejects_below_threshold():
+    """
+    Globalized R-LBFGS cautious-update rejection.
+
+    Verifies that a curvature pair is rejected when
+
+        <s, y> < omega * max(||s||_F^2, ||y||_F^2).
+    """
+    omega = 0.5
+
+    s = torch.tensor([1.0, 0.0])
+    y = torch.tensor([0.1, 1.0])
+
+    assert not cautious_condition(
+        s,
+        y,
+        omega,
+    )
+
+
+def test_cautious_condition_accepts_exact_threshold():
+    """
+    Globalized R-LBFGS cautious-update boundary case.
+
+    Verifies that equality at the cautious threshold is accepted:
+
+        <s, y> = omega * max(||s||_F^2, ||y||_F^2).
+
+    The paper specifies a non-strict inequality (>=).
+    """
+    omega = 0.5
+
+    s = torch.tensor([1.0, 0.0])
+    y = torch.tensor([0.5, 0.0])
+
+    sy = torch.sum(s * y).item()
+
+    threshold = omega * max(
+        s.norm().pow(2).item(),
+        y.norm().pow(2).item(),
+    )
+
+    assert abs(sy - threshold) < 1e-12
+
+    assert cautious_condition(
+        s,
+        y,
+        omega,
+    )
+
+

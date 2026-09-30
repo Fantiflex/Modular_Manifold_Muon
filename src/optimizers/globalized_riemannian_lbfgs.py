@@ -78,7 +78,8 @@ class GlobalizedRiemannianLBFGS:
         self.accepted_updates = 0
         self.rejected_updates = 0  
         self.cautious_margins = []
-
+        self.degenerate_updates = 0
+        self.zero_threshold_updates = 0
     # ------------------------------------------------------------------
     # L-BFGS two-loop recursion
     # ------------------------------------------------------------------
@@ -350,12 +351,6 @@ class GlobalizedRiemannianLBFGS:
             s.norm().pow(2).item(),
             y.norm().pow(2).item(),
         )
-        if threshold > 0:
-            margin = sy / threshold
-        else:
-            margin = float("inf")
-
-        self.cautious_margins.append(margin)
 
         # Reject degenerate curvature pairs explicitly.
         nondegenerate = (
@@ -363,11 +358,29 @@ class GlobalizedRiemannianLBFGS:
             and y.norm().item() > 1e-12
         )
 
+        # Diagnostics
+        if not nondegenerate:
+            self.degenerate_updates += 1
+
+        if threshold == 0:
+            self.zero_threshold_updates += 1
+
+        if nondegenerate and threshold > 0:
+            margin = sy / threshold
+            self.cautious_margins.append(margin)
+
+        accepted = nondegenerate and sy >= threshold
+
         accepted = nondegenerate and sy >= threshold
         if accepted:
             self.accepted_updates += 1
         else:
             self.rejected_updates += 1
+        if not nondegenerate:
+            self.degenerate_updates += 1
+
+        if threshold == 0:
+            self.zero_threshold_updates += 1
         # --------------------------------------------------------------
         # Transport existing L-BFGS memory into T_{W_new} M
         # --------------------------------------------------------------

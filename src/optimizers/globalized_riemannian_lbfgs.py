@@ -148,8 +148,9 @@ class GlobalizedRiemannianLBFGS:
 
             r = r + (alpha - beta) * s
 
-        # Search direction
-        return -r
+        # Approximate inverse-Hessian product H_k g_k.
+        # The descent sign is applied explicitly in step().
+        return r
 
     # ------------------------------------------------------------------
     # Initial inverse-Hessian scaling
@@ -231,11 +232,14 @@ class GlobalizedRiemannianLBFGS:
             default=1.0
         )
 
-        # Quasi-Newton search direction
-        P = self.two_loop(
+        H_g = self.two_loop(
             G_riem,
             gamma,
         )
+
+        # Quasi-Newton descent direction:
+        # p_k = -H_k g_k
+        P = -H_g
 
         # --------------------------------------------------------------
         # Fixed-length step

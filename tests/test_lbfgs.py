@@ -111,3 +111,41 @@ def test_globalized_history_is_bounded():
         W = W_new
 
         assert len(opt.pairs) <= 2
+
+
+def test_vanilla_initial_direction_is_descent():
+    optimizer = RiemannianLBFGS(
+        eta=0.1,
+        history=10,
+    )
+
+    q = torch.randn(5, 3)
+
+    h = optimizer.two_loops(q)
+
+    step = -h
+
+    inner_product = torch.sum(step * q)
+
+    assert inner_product < 0
+
+
+
+def test_globalized_initial_direction_is_descent():
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.1,
+        history=10,
+    )
+
+    q = torch.randn(5, 3)
+
+    h = optimizer.two_loop(
+        q,
+        gamma=1.0,
+    )
+
+    step = -h
+
+    inner_product = torch.sum(step * q)
+
+    assert inner_product < 0

@@ -356,18 +356,8 @@ class GlobalizedRiemannianLBFGS:
 
         accepted = nondegenerate and sy >= threshold
 
-        if accepted:
-            self.pairs.append(
-                (
-                    s.detach(),
-                    y.detach(),
-                )
-            )
-
-            if len(self.pairs) > self.history:
-                self.pairs.pop(0)
-            # --------------------------------------------------------------
-        # Transport the entire L-BFGS memory into the new tangent space
+        # --------------------------------------------------------------
+        # Transport existing L-BFGS memory into T_{W_new} M
         # --------------------------------------------------------------
 
         self.pairs = [
@@ -385,6 +375,22 @@ class GlobalizedRiemannianLBFGS:
             )
             for s_i, y_i in self.pairs
         ]
+
+        # --------------------------------------------------------------
+        # Add the new curvature pair
+        # s and y already live in T_{W_new} M
+        # --------------------------------------------------------------
+
+        if accepted:
+            self.pairs.append(
+                (
+                    s.detach().clone(),
+                    y.detach().clone(),
+                )
+            )
+
+            if len(self.pairs) > self.history:
+                self.pairs.pop(0)
 
         self._pending = None
 

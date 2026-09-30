@@ -5,6 +5,10 @@ from src.optimizers import (
     GlobalizedRiemannianLBFGS,
 )
 
+from src.geometry.stiefel import (
+    tangent_proj,
+    transport_by_projection,
+)
 
 def random_stiefel(n: int, p: int) -> torch.Tensor:
     """Generate an n x p matrix with orthonormal columns."""
@@ -149,3 +153,149 @@ def test_globalized_initial_direction_is_descent():
     inner_product = torch.sum(step * q)
 
     assert inner_product < 0
+
+
+
+
+def test_vanilla_cached_step_matches_applied_displacement():
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.1,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    optimizer.step(W, G)
+
+    assert optimizer.last is not None
+
+    d = optimizer.last["d"]
+    step_vec = optimizer.last["step_vec"]
+
+    expected_step = -optimizer.eta * d
+
+    assert torch.allclose(
+        step_vec,
+        expected_step,
+        atol=1e-6,
+    )
+
+
+def test_vanilla_curvature_displacement_is_transported_step():
+    torch.manual_seed(0)
+
+    optimizer = RiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    W_new = optimizer.step(W, G)
+
+    W_old = optimizer.last["W"]
+    step_vec = optimizer.last["step_vec"]
+
+    expected_s = transport_by_projection(
+        W_old,
+        W_new,
+        step_vec,
+    )
+
+    # Construct a new gradient that produces
+    # positive curvature in the step direction.
+    G_new = G + step_vec
+
+    accepted = optimizer.update(G_new)
+
+    if accepted:
+        stored_s = optimizer.S[-1]
+
+        assert torch.allclose(
+            stored_s,
+            expected_s,
+            atol=1e-5,
+        )
+
+
+def test_globalized_cached_step_has_fixed_frobenius_norm():
+    torch.manual_seed(0)
+
+    eta = 0.1
+
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=eta,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    optimizer.step(W, G)
+
+    assert optimizer._pending is not None
+
+    _, _, step_vec, _ = optimizer._pending
+
+    assert torch.allclose(
+        step_vec.norm(),
+        torch.tensor(
+            eta,
+            dtype=step_vec.dtype,
+            device=step_vec.device,
+        ),
+        atol=1e-5,
+    )
+
+
+
+
+def test_globalized_curvature_displacement_is_transported_step():
+    torch.manual_seed(0)
+
+    optimizer = GlobalizedRiemannianLBFGS(
+        eta=0.05,
+        history=10,
+    )
+
+    W = torch.linalg.qr(
+        torch.randn(5, 3)
+    ).Q
+
+    G = torch.randn_like(W)
+
+    W_new = optimizer.step(W, G)
+
+    W_old, _, step_vec, _ = optimizer._pending
+
+    expected_s = transport_by_projection(
+        W_old,
+        W_new,
+        step_vec,
+    )
+
+    G_new = G + step_vec
+
+    accepted = optimizer.update(G_new)
+
+    if accepted:
+        stored_s, _ = optimizer.pairs[-1]
+
+        assert torch.allclose(
+            stored_s,
+            expected_s,
+            atol=1e-5,
+        )

@@ -77,6 +77,7 @@ class GlobalizedRiemannianLBFGS:
         self._pending = None
         self.accepted_updates = 0
         self.rejected_updates = 0  
+        self.cautious_margins = []
 
     # ------------------------------------------------------------------
     # L-BFGS two-loop recursion
@@ -349,6 +350,12 @@ class GlobalizedRiemannianLBFGS:
             s.norm().pow(2).item(),
             y.norm().pow(2).item(),
         )
+        if threshold > 0:
+            margin = sy / threshold
+        else:
+            margin = float("inf")
+
+        self.cautious_margins.append(margin)
 
         # Reject degenerate curvature pairs explicitly.
         nondegenerate = (

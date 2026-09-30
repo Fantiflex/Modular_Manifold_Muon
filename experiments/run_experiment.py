@@ -129,6 +129,11 @@ def main():
         device=device,
     )
 
+    margin = optimizer_stats.get("mean_cautious_margin")
+
+    if margin is not None:
+        print(f"Mean cautious margin: {margin:.4f}")
+
     print("\n========== RESULTS ==========")
     print(f"Train accuracy: {train_accuracy:.2f}%")
     print(f"Test accuracy: {test_accuracy:.2f}%")

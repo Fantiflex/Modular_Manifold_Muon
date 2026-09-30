@@ -257,10 +257,10 @@ class GlobalizedRiemannianLBFGS:
 
         # Save information required for cautious update.
         self._pending = (
-            W.detach(),
-            G_riem.detach(),
-            step_vec.detach(),
-            W_new.detach(),
+            W.detach().clone(),
+            G_riem.detach().clone(),
+            step_vec.detach().clone(),
+            W_new.detach().clone(),
         )
 
         return W_new

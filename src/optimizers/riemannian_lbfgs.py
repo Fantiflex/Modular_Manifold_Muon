@@ -225,10 +225,10 @@ class RiemannianLBFGS:
         # --------------------------------------------------------------
 
         self.last = {
-            "W": W,
-            "W_new": W_new,
-            "g": g,
-            "d": d,
+            "W": W.detach().clone(),
+            "W_new": W_new.detach().clone(),
+            "g": g.detach().clone(),
+            "d": d.detach().clone(),
             "should_transpose": should_transpose,
         }
 

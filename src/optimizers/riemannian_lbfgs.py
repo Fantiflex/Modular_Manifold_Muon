@@ -102,9 +102,9 @@ class RiemannianLBFGS:
         """
 
         # No curvature information yet:
-        # fall back to the behavior used in the original notebook.
+        # use the identity inverse-Hessian approximation.
         if len(self.S) == 0:
-            return -q
+            return q
 
         alpha = []
 
@@ -216,8 +216,9 @@ class RiemannianLBFGS:
         # Ambient update + retraction
         # --------------------------------------------------------------
 
-        W_new = W - self.eta * d
+        step_vec = -self.eta * d
 
+        W_new = W + step_vec
         W_new = self._retract(W_new)
 
         # --------------------------------------------------------------
@@ -229,6 +230,7 @@ class RiemannianLBFGS:
             "W_new": W_new.detach().clone(),
             "g": g.detach().clone(),
             "d": d.detach().clone(),
+            "step_vec": step_vec.detach().clone(),
             "should_transpose": should_transpose,
         }
 
@@ -264,6 +266,7 @@ class RiemannianLBFGS:
             raise RuntimeError(
                 "update() must be called after step()."
             )
+        step_vec = self.last["step_vec"]
 
         W = self.last["W"]
         W_new = self.last["W_new"]
@@ -289,7 +292,7 @@ class RiemannianLBFGS:
         s = transport_by_projection(
             W,
             W_new,
-            self.eta * d,
+            step_vec,
         )
 
         transported_g = transport_by_projection(
@@ -299,6 +302,27 @@ class RiemannianLBFGS:
         )
 
         y = g_new - transported_g
+        # --------------------------------------------------------------
+        # Transport existing L-BFGS memory to T_{W_new} M
+        # --------------------------------------------------------------
+
+        self.S = [
+            transport_by_projection(
+                W,
+                W_new,
+                s_i,
+            )
+            for s_i in self.S
+        ]
+
+        self.Y = [
+            transport_by_projection(
+                W,
+                W_new,
+                y_i,
+            )
+            for y_i in self.Y
+        ]
 
         # --------------------------------------------------------------
         # Curvature safeguard

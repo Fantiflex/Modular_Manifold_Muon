@@ -23,7 +23,10 @@ def random_stiefel(n: int, p: int) -> torch.Tensor:
 
 def test_tangent_projection():
     """
-    A tangent vector Z at W must satisfy:
+    Stiefel tangent-space projection.
+
+    Verifies that tangent_proj(W, Z) satisfies the defining
+    tangent-space constraint
 
         W^T Z + Z^T W = 0.
     """
@@ -47,7 +50,9 @@ def test_tangent_projection():
 
 def test_polar_retraction():
     """
-    Polar retraction should return a point satisfying:
+    Polar retraction onto the Stiefel manifold.
+
+    Verifies that the retracted matrix has orthonormal columns:
 
         W^T W = I.
     """
@@ -110,8 +115,12 @@ def test_shape_preserving_retraction():
 
 def test_vector_transport_is_tangent():
     """
-    Projection-based transport must produce a tangent vector
-    at the destination point.
+    Projection-based vector transport.
+
+    Verifies that a tangent vector transported from W_k to W_{k+1}
+    belongs to the destination tangent space:
+
+        W_{k+1}^T Z + Z^T W_{k+1} = 0.
     """
 
     W_old = random_stiefel(10, 4)

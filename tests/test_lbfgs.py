@@ -158,6 +158,16 @@ def test_globalized_initial_direction_is_descent():
 
 
 def test_vanilla_cached_step_matches_applied_displacement():
+    """
+    Vanilla R-LBFGS displacement convention.
+
+    Verifies that the cached tangent displacement is exactly
+
+        xi_k = -eta H_k g_k,
+
+    so that the curvature vector s_k is constructed from the same
+    displacement that was actually used to update W_k.
+    """
     torch.manual_seed(0)
 
     optimizer = RiemannianLBFGS(
@@ -229,6 +239,16 @@ def test_vanilla_curvature_displacement_is_transported_step():
 
 
 def test_globalized_cached_step_has_fixed_frobenius_norm():
+    """
+    Globalized R-LBFGS fixed-step budget.
+
+    Verifies that the normalized tangent displacement xi_k satisfies
+
+        ||xi_k||_F = eta,
+
+    which implements the fixed Frobenius-norm budget used by the
+    globalized optimizer.
+    """
     torch.manual_seed(0)
 
     eta = 0.1
@@ -313,6 +333,16 @@ def assert_tangent(W, Z, atol=1e-5):
 
 
 def test_vanilla_y_matches_gradient_difference():
+    """
+    Vanilla R-LBFGS curvature vector y_k.
+
+    Verifies the Riemannian curvature equation
+
+        y_k = g_{k+1} - T_{k -> k+1}(g_k),
+
+    and checks that both s_k and y_k belong to the tangent space
+    at W_{k+1}.
+    """
     torch.manual_seed(0)
 
     optimizer = RiemannianLBFGS(
@@ -456,6 +486,15 @@ def test_globalized_y_matches_gradient_difference():
 
 
 def test_globalized_memory_stays_in_current_tangent_space():
+    """
+    Globalized R-LBFGS memory transport.
+
+    Verifies that after moving from W_k to W_{k+1}, every stored
+    L-BFGS curvature pair is transported into the current tangent
+    space T_{W_{k+1}} St(d, p).
+
+    This guards against double transport and stale tangent-space memory.
+    """
     torch.manual_seed(0)
 
     optimizer = GlobalizedRiemannianLBFGS(

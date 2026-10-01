@@ -9,9 +9,12 @@ from experiments.sweeps import (
 from src.data import create_cifar10_dataloaders
 
 def main() -> None:
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
-    )
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
     print(f"Device: {device}")
 
@@ -19,13 +22,21 @@ def main() -> None:
     epochs = 3
     history = 10
 
-    seeds = [42]
+    seeds = [0, 15, 42]
 
-    etas = [0.1]
+    etas = [
+        1e-3,
+        1e-2,
+        5e-2,
+        1e-1,
+        3e-1,
+        5e-1,
+    ]
 
     optimizers = [
-        
         "dual_ascent",
+        "rlbfgs",
+        "globalized_rlbfgs",
     ]
 
     train_loader, test_loader = (
@@ -34,7 +45,7 @@ def main() -> None:
             batch_size=batch_size,
         )
     )
-
+    checkpoint_path="results/mlp_optimizer_sweep_gpu.csv"
     results = run_optimizer_sweep(
         model_type="mlp",
         train_loader=train_loader,
@@ -53,6 +64,7 @@ def main() -> None:
         results,
         "results/mlp_optimizer_sweep.csv",
     )
+
 
 
 if __name__ == "__main__":

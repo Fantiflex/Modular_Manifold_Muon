@@ -1,3 +1,5 @@
 torch
 torchvision
 pytest
+matplotlib
+pandas

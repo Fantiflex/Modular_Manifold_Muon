@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from src.optimizers import (
     RiemannianLBFGS,
     GlobalizedRiemannianLBFGS,
+    ManifoldMuon,
 )
 
 def linear_decay_lr(
@@ -189,6 +190,7 @@ def initialize_manifold_optimizers(
     optimizer_classes = {
         "rlbfgs": RiemannianLBFGS,
         "globalized_rlbfgs": GlobalizedRiemannianLBFGS,
+        "dual_ascent": ManifoldMuon, 
     }
 
     if optimizer_name not in optimizer_classes:

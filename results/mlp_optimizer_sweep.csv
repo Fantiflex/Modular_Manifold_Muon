@@ -1,2 +1,2 @@
 model,optimizer,lr,seed,epochs,batch_size,history,status,error,train_accuracy,test_accuracy,final_loss,total_time_s,accepted_updates,rejected_updates,acceptance_rate,mean_cautious_margin,mean_omega,min_omega,max_omega
-mlp,globalized_rlbfgs,0.3,42,3,1024,10,ok,,49.582,47.04,1.4938039658020954,18.37582278251648,438,3,0.9931972789115646,1435.5268278558685,9.931972789115646e-05,0.0,0.0001
+mlp,dual_ascent,0.1,42,3,1024,10,ok,,62.29,51.71,1.226438257159019,4980.988718032837,0,0,0.0,,,,
